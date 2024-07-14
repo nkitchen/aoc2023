@@ -2,6 +2,7 @@
 
 import fileinput
 import itertools
+import math
 import re
 from pprint import pprint
 
@@ -29,19 +30,36 @@ def main():
 
         print("Part 1:", steps)
 
-    nn = set()
+    # Part 2:
+    # My input structure: Multiple disjoint rings of nodes, each with one start
+    # (A) node and one end (Z) node.
+
+    start = set()
     for n in succs:
         if n.endswith('A'):
-            nn.add(n)
+            start.add(n)
 
-    steps = 0
-    for inst in itertools.cycle(insts):
-        nn = set(succs[n][inst_index[inst]] for n in nn)
-        steps += 1
-        if all(n.endswith('Z') for n in nn):
-            break
+    z_cycle_lengths = []
 
-    print("Part 2:", steps)
+    for s in start:
+        t = 0
+        z_times = []
+        n = s
+        while True:
+            i = t % len(insts)
+            inst = insts[i]
+            n = succs[n][inst_index[inst]]
+            t += 1
+            if n.endswith('Z'):
+                z_times.append(t)
+                if len(z_times) == 2:
+                    # There's no initial part of the path before entering the cycle.
+                    assert(z_times[1] == 2 * z_times[0])
+                    z_cycle_lengths.append(z_times[0])
+                    break
+
+    t = math.lcm(*z_cycle_lengths)
+    print("Part 2:", t)
 
 main()
 
