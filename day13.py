@@ -44,16 +44,18 @@ def reflection_summary_fixed(grid):
     for i in range(m):
         for j in range(n):
             grid_fixed[i][j] = flip[grid_fixed[i][j]]
-            s_fixed = reflection_summary(grid_fixed, exclude=s_smudged)
-            dprint(f"Fix [{i}][{j}]:", s_fixed)
-            if s_fixed is not None:
-                return s_fixed
+            for s_fixed in reflection_summaries(grid_fixed):
+                if s_fixed is not None and s_fixed != s_smudged:
+                    return s_fixed
 
             grid_fixed[i][j] = flip[grid_fixed[i][j]]
 
     return None
 
-def reflection_summary(grid, exclude=None):
+def reflection_summary(grid):
+    return next(reflection_summaries(grid))
+
+def reflection_summaries(grid):
     m = len(grid)
     n = len(grid[0])
 
@@ -73,7 +75,7 @@ def reflection_summary(grid, exclude=None):
                 sig += 1 << i
         col_sigs.append(sig)
 
-    def _before_reflection(sigs, exclude=None):
+    def _before_reflection(sigs):
         for k1 in range(1, len(sigs)):
             k2 = len(sigs) - k1
             if k1 <= k2:
@@ -84,23 +86,16 @@ def reflection_summary(grid, exclude=None):
                 kk = k2
                 sigs1 = sigs[k1 - kk : k1]
                 sigs2 = sigs[k1 : k1 + kk]
-            if sigs1 == list(reversed(sigs2)) and k1 != exclude:
-                return k1
-        return None
+            if sigs1 == list(reversed(sigs2)):
+                yield k1
 
-    exclude_rows = None
-    if exclude is not None and exclude % 100 == 0:
-        exclude_rows = exclude // 100
-
-    if (k := _before_reflection(col_sigs, exclude=exclude)) is not None:
-        return k
-    elif (k := _before_reflection(row_sigs, exclude=exclude_rows)) is not None:
-        return 100 * k
-    else:
-        return None
+    for k in _before_reflection(col_sigs):
+        yield k
+    for k in _before_reflection(row_sigs):
+        yield 100 * k
 
 main()
 
 # multitime -n 5 ; median:
-# cpython: 0.410s
-# pypy:    0.222s
+# cpython: 0.433s
+# pypy:    0.326s
