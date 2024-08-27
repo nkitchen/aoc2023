@@ -67,103 +67,89 @@ def main():
                     print(i, j)
                     raise
 
-    def moves(s):
-        if s.loc == (0, 0):
-            for k in range(1, 4):
-                yield State(loc=(0, k), vel=(0, 1))
-                yield State(loc=(k, 0), vel=(1, 0))
-            return
+    def min_heat_loss(min_run, max_run):
+        def _moves(s):
+            if s.loc == (0, 0):
+                for k in range(min_run, max_run + 1):
+                    if k < m:
+                        yield State(loc=(k, 0), vel=(1, 0))
+                    if k < n:
+                        yield State(loc=(0, k), vel=(0, 1))
+                return
 
-        for vv in (rot_left(s.vel), rot_right(s.vel)):
-            di, dj = vv
-            for k in range(1, 4):
-                ii = s.loc[0] + k * di
-                jj = s.loc[1] + k * dj
-                if (0 <= ii < m) and (0 <= jj < n):
-                    yield State(loc=(ii, jj), vel=vv)
+            for vv in (rot_left(s.vel), rot_right(s.vel)):
+                di, dj = vv
+                for k in range(min_run, max_run + 1):
+                    ii = s.loc[0] + k * di
+                    jj = s.loc[1] + k * dj
+                    if (0 <= ii < m) and (0 <= jj < n):
+                        yield State(loc=(ii, jj), vel=vv)
 
-    pred = {}
-    start = State(loc=(0, 0), vel=(0, 0))
-    loss_so_far = defaultdict(lambda: math.inf)
-    loss_so_far[start] = 0
-    q = [(min_loss_to_factory[start.loc], start)]
-    frontier = set([start])
-    while q:
-        e, s = heapq.heappop(q)
-        if s.loc == (m - 1, n - 1):
-            break
+        pred = {}
+        start = State(loc=(0, 0), vel=(0, 0))
+        loss_so_far = defaultdict(lambda: math.inf)
+        loss_so_far[start] = 0
+        q = [(min_loss_to_factory[start.loc], start)]
+        frontier = set([start])
+        while q:
+            e, s = heapq.heappop(q)
+            if s.loc == (m - 1, n - 1):
+                break
 
-        frontier.remove(s)
-        #if s.loss < visited.get(s.loc, s.loss + 1):
-        #    visited[s.loc] = s.loss
-        #else:
-        #    continue
+            frontier.remove(s)
 
-        #pred[s.loc] = s.pred
+            dprint("==", e, s)
 
-        if DEBUG & 4:
-            for i in range(m):
-                for j in range(n):
-                    v = str(loss_so_far.get(State(loc=(i, j)), "."))
-                    ml = min_loss_to_factory[(i, j)]
-                    print(f"{grid[i][j]:>4}:{v:>2}+{ml:>2} ", end='')
-                print()
-            print()
-
-        dprint("==", e, s)
-
-        i, j = s.loc
-        for ss in moves(s):
-            ii, jj = ss.loc
-
-            loss = loss_so_far[s]
-            if ii == i:
-                for mj in range(jj, j, -ss.vel[1]):
-                    loss += grid[ii][mj]
-            else:
-                assert jj == j
-                for mi in range(ii, i, -ss.vel[0]):
-                    loss += grid[mi][jj]
-
-            if loss < loss_so_far[ss]:
-                pred[ss] = s
-                loss_so_far[ss] = loss
-                est_loss = loss + min_loss_to_factory[ss.loc]
-                if ss not in frontier:
-                    frontier.add(ss)
-                    heapq.heappush(q, (est_loss, ss))
-                    dprint("  > ", est_loss, ss)
-
-            ##if loss > visited.get(dst, loss + 1):
-            ##    continue
-            #est_loss = loss # + min_loss_to_factory[(ii, jj)]
-            #ss = State(est_loss, loss, dst, vel, run, s.loc)
-            #dprint("  > ", ss)
-            #heapq.heappush(q, ss)
-
-    print("Part 1:", loss_so_far[s])
-
-    if DEBUG & 8:
-        path = [["."] * n for i in range(m)]
-        while s:
             i, j = s.loc
-            if s.vel == (0, 1):
-                path[i][j] = '>'
-            elif s.vel == (0, -1):
-                path[i][j] = '<'
-            elif s.vel == (1, 0):
-                path[i][j] = 'v'
-            elif s.vel == (-1, 0):
-                path[i][j] = '^'
-            else:
-                path[i][j] = '#'
-            s = pred.get(s)
+            for ss in _moves(s):
+                ii, jj = ss.loc
 
-        for i in range(m):
-            print(''.join(path[i]))
+                loss = loss_so_far[s]
+                if ii == i:
+                    for mj in range(jj, j, -ss.vel[1]):
+                        loss += grid[ii][mj]
+                else:
+                    assert jj == j
+                    for mi in range(ii, i, -ss.vel[0]):
+                        loss += grid[mi][jj]
+
+                if loss < loss_so_far[ss]:
+                    pred[ss] = s
+                    loss_so_far[ss] = loss
+                    est_loss = loss + min_loss_to_factory[ss.loc]
+                    if ss not in frontier:
+                        frontier.add(ss)
+                        heapq.heappush(q, (est_loss, ss))
+                        dprint("  > ", est_loss, ss)
+
+        ret = loss_so_far[s]
+
+        if DEBUG & 8:
+            path = [["."] * n for i in range(m)]
+            while s:
+                i, j = s.loc
+                if s.vel == (0, 1):
+                    path[i][j] = '>'
+                elif s.vel == (0, -1):
+                    path[i][j] = '<'
+                elif s.vel == (1, 0):
+                    path[i][j] = 'v'
+                elif s.vel == (-1, 0):
+                    path[i][j] = '^'
+                else:
+                    path[i][j] = '#'
+                s = pred.get(s)
+
+            for i in range(m):
+                print(''.join(path[i]))
+
+        return ret
+
+    print("Part 1:", min_heat_loss(1, 3))
+    print("Part 2:", min_heat_loss(4, 10))
         
 main()
 
 # multitime -n 5 ; median:
-# cpython: 3.783s
-# pypy:    1.258s
+# cpython: 3.842s
+# pypy:    2.278s
