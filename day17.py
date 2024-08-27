@@ -14,7 +14,7 @@ def dprint(*args):
     if DEBUG:
         print(*args)
 
-State = namedtuple('State', 'loc vel run')
+State = namedtuple('State', 'loc vel')
 
 def rot_left(vel):
     return (-vel[1], vel[0])
@@ -69,24 +69,21 @@ def main():
 
     def moves(s):
         if s.loc == (0, 0):
-            yield ((0, 1), (0, 1))
-            yield ((1, 0), (1, 0))
+            for k in range(1, 4):
+                yield State(loc=(0, k), vel=(0, 1))
+                yield State(loc=(k, 0), vel=(1, 0))
             return
 
-        if s.run < 3:
-            ii = s.loc[0] + s.vel[0]
-            jj = s.loc[1] + s.vel[1]
-            if (0 <= ii < m) and (0 <= jj < n):
-                yield s.vel, (ii, jj)
-
         for vv in (rot_left(s.vel), rot_right(s.vel)):
-            ii = s.loc[0] + vv[0]
-            jj = s.loc[1] + vv[1]
-            if (0 <= ii < m) and (0 <= jj < n):
-                yield vv, (ii, jj)
+            di, dj = vv
+            for k in range(1, 4):
+                ii = s.loc[0] + k * di
+                jj = s.loc[1] + k * dj
+                if (0 <= ii < m) and (0 <= jj < n):
+                    yield State(loc=(ii, jj), vel=vv)
 
     pred = {}
-    start = State(loc=(0, 0), vel=(0, 0), run=0)
+    start = State(loc=(0, 0), vel=(0, 0))
     loss_so_far = defaultdict(lambda: math.inf)
     loss_so_far[start] = 0
     q = [(min_loss_to_factory[start.loc], start)]
@@ -115,18 +112,23 @@ def main():
 
         dprint("==", e, s)
 
-        for vel, dst in moves(s):
-            if vel == s.vel:
-                run = s.run + 1
+        i, j = s.loc
+        for ss in moves(s):
+            ii, jj = ss.loc
+
+            loss = loss_so_far[s]
+            if ii == i:
+                for mj in range(jj, j, -ss.vel[1]):
+                    loss += grid[ii][mj]
             else:
-                run = 1
-            ss = State(loc=dst, vel=vel, run=run)
-            ii, jj = dst
-            loss = loss_so_far[s] + grid[ii][jj]
+                assert jj == j
+                for mi in range(ii, i, -ss.vel[0]):
+                    loss += grid[mi][jj]
+
             if loss < loss_so_far[ss]:
-                pred[dst] = s.loc
+                pred[ss] = s
                 loss_so_far[ss] = loss
-                est_loss = loss + min_loss_to_factory[dst]
+                est_loss = loss + min_loss_to_factory[ss.loc]
                 if ss not in frontier:
                     frontier.add(ss)
                     heapq.heappush(q, (est_loss, ss))
@@ -139,18 +141,26 @@ def main():
             #dprint("  > ", ss)
             #heapq.heappush(q, ss)
 
-    path = [["."] * n for i in range(m)]
-    loc = (m - 1, n - 1)
-    while loc:
-        i, j = loc
-        path[i][j] = '#'
-        loc = pred.get(loc)
+    print("Part 1:", loss_so_far[s])
 
-    if True or DEBUG & 8:
+    if DEBUG & 8:
+        path = [["."] * n for i in range(m)]
+        while s:
+            i, j = s.loc
+            if s.vel == (0, 1):
+                path[i][j] = '>'
+            elif s.vel == (0, -1):
+                path[i][j] = '<'
+            elif s.vel == (1, 0):
+                path[i][j] = 'v'
+            elif s.vel == (-1, 0):
+                path[i][j] = '^'
+            else:
+                path[i][j] = '#'
+            s = pred.get(s)
+
         for i in range(m):
             print(''.join(path[i]))
-
-    print("Part 1:", s.loss)
         
 main()
 
