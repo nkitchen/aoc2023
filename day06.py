@@ -50,5 +50,5 @@ def win_ways(times, records):
 main()
 
 # multitime -n 5 ; median:
-# cpython: 0.064s
-# pypy:    0.087s
+# cpython: 0.049s
+# pypy:    0.091s
