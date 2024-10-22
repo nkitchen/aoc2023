@@ -6,10 +6,13 @@ import sys
 from pprint import pprint
 
 import functools
+import itertools
+import heapq
+import string
 from collections import defaultdict
 from collections import namedtuple
 
-DEBUG = int(os.environ.get("DEBUG", "0"))
+DEBUG = os.environ.get("DEBUG", "")
 
 def dprint(*args):
     if DEBUG:
@@ -52,7 +55,7 @@ def main():
                 if (dz := bricks[bi][0].z - bricks[bj][1].z) > 0:
                     dzs.append(dz)
             if dzs:
-                yield from dzs
+                yield min(dzs)
             else:
                 # Distance to ground
                 yield bricks[bi][0].z
@@ -67,6 +70,14 @@ def main():
 
     # All the bricks have fallen.
 
+    if "check" in DEBUG:
+        # The bricks are still in the same order.
+        for xy in bricks_by_xy:
+            for i, bi in enumerate(bricks_by_xy[xy]):
+                for j in range(i + 1, len(bricks_by_xy[xy])):
+                    bj = bricks_by_xy[xy][j]
+                    assert bricks[bi][1].z < bricks[bj][0].z
+
     supporters = defaultdict(set)
     for bi in range(len(bricks)):
         bi0z = bricks[bi][0].z
@@ -79,6 +90,12 @@ def main():
             if supp is not None:
                 supporters[bi].add(supp)
 
+    if "check" in DEBUG:
+        # Every brick rests on at least one other (or the ground).
+        for b in range(len(bricks)):
+            if not supporters[bi]:
+                assert bricks[bi][0].z == 1
+
     lone_supporters = set()
     for bi in supporters:
         if len(supporters[bi]) == 1:
@@ -86,6 +103,10 @@ def main():
 
     disintegrable = len(bricks) - len(lone_supporters)
     print("Part 1:", disintegrable)
+
+    code = dict(zip(range(len(bricks)),
+                    (''.join(args) for args in
+                     itertools.product(string.ascii_uppercase, repeat=2))))
 
     # The critical bricks of brick bi are the bricks in its transitive support
     # such that, if any one of them were disintegrated, it would fall.
@@ -97,11 +118,10 @@ def main():
         if supporters[bi]:
             crit = functools.reduce(set.intersection,
                                     (_find_critical(bj) for bj in supporters[bi]))
+            if len(supporters[bi]) == 1:
+                crit = crit.union(supporters[bi])
         else:
             crit = set()
-
-        if len(supporters[bi]) == 1:
-            crit |= supporters[bi]
 
         critical[bi] = crit
         return crit
@@ -109,13 +129,50 @@ def main():
     t = 0
     for bi in range(len(bricks)):
         crit = _find_critical(bi)
-        dprint(f"Crit of {bi}: {crit}")
+        if "crit" in DEBUG:
+            print(f"Crit of {bi} {code[bi]}: {crit}", [code[bj] for bj in crit])
         t += len(crit)
-
     print("Part 2:", t)
+
+    if "draw" in DEBUG:
+
+        grid = {}
+        for bi, b in enumerate(bricks):
+            for z in range(b[0].z, b[1].z + 1):
+                for x, y in _brick_xy(b):
+                    grid[(x, y, z)] = bi
+
+        zmax = max(z for x, y, z in grid)
         
+        def printc(*args):
+            print(*args, end="")
+
+        printc("    ")
+        for y in range(10):
+            printc(f"{y=} ")
+            printc("  " * 9)
+        print()
+
+        printc("    ")
+        for y in range(10):
+            for x in range(10):
+                printc(f"{x:>2}")
+            printc("  ")
+        print()
+
+        for z in range(zmax, 0, -1):
+            printc(f"{z:>4}")
+            for y in range(10):
+                for x in range(10):
+                    if (bi := grid.get((x, y, z))) is not None:
+                        printc(code[bi])
+                    else:
+                        printc("..")
+                printc("  ")
+            print()
+
 main()
 
 # multitime -n 5 ; median:
-# cpython: 21.457s
-# pypy:    13.009s
+# cpython: 0.112s
+# pypy:    0.257s
