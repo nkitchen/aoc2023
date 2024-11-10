@@ -116,35 +116,22 @@ def main():
         for v, d in steps_from[u]:
             adj[v].append((u, d))
 
-    # But: The longest-path problem is NP-complete in general.
-    # I'm going to take a leap of faith with a greedy approach:
-    # backtracking recursive search, preferring the highest-distance edge at
-    # each step.
+    # The longest-path problem is NP-complete in general.
+    # I don't try to do anything smart, just a backtracking search.
 
-    def _longest_path(u, steps_so_far, visited):
+    def _path_lengths(u, steps_so_far, visited):
         if u == end:
-            return steps_so_far
+            yield steps_so_far
+            return
 
-        choices = [(d, v) for v, d in adj[u]
-                   if v not in visited]
-        if not choices:
-            return None
+        for v, d in adj[u]:
+            if v in visited:
+                continue
+            v_visited = visited | {v}
+            for p in _path_lengths(v, steps_so_far + d, v_visited):
+                yield p
 
-        choices.sort(reverse=True)
-        for d, v in choices:
-            steps_so_far += d
-            visited.add(v)
-
-            p = _longest_path(v, steps_so_far, visited)
-            if p is not None:
-                return p
-
-            steps_so_far -= d
-            visited.remove(v)
-
-        return None
-
-    hike = _longest_path(start, 0, {start})
+    hike = max(_path_lengths(start, 0, frozenset({start})))
     print("Part 2:", hike)
 
 main()
