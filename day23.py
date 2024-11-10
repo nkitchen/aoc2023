@@ -117,25 +117,34 @@ def main():
             adj[v].append((u, d))
 
     # But: The longest-path problem is NP-complete in general.
-    # I'm going to take a blind leap of faith, and trust that I can get the
-    # right path by a naive greedy approach: At each step, take the largest-weight
-    # edge available (that is, that goes to an unvisited point).
+    # I'm going to take a leap of faith with a greedy approach:
+    # backtracking recursive search, preferring the highest-distance edge at
+    # each step.
 
-    visited = set(start)
-    u = start
-    hike = 0
-    while True:
+    def _longest_path(u, steps_so_far, visited):
         if u == end:
-            break
+            return steps_so_far
 
-        choices = [(d, v) for v, d in steps_from[u]
+        choices = [(d, v) for v, d in adj[u]
                    if v not in visited]
-        choices.sort()
-        d, v = choices[-1]
-        visited.add(v)
-        hike += d
-        u = v
+        if not choices:
+            return None
 
+        choices.sort(reverse=True)
+        for d, v in choices:
+            steps_so_far += d
+            visited.add(v)
+
+            p = _longest_path(v, steps_so_far, visited)
+            if p is not None:
+                return p
+
+            steps_so_far -= d
+            visited.remove(v)
+
+        return None
+
+    hike = _longest_path(start, 0, {start})
     print("Part 2:", hike)
 
 main()
