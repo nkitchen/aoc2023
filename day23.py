@@ -1,10 +1,13 @@
 #!/usr/bin/env python3
 
+# This version debugged with the help of https://github.com/p88h/aoc2023
+
 import fileinput
 import os
 import sys
 from pprint import pprint
 
+import copy
 import functools
 import heapq
 from collections import defaultdict
@@ -111,7 +114,7 @@ def main():
     # treat the edges as reversible.
 
     # Add the reverse edges.
-    adj = steps_from.copy()
+    adj = copy.deepcopy(steps_from)
     for u in steps_from:
         for v, d in steps_from[u]:
             adj[v].append((u, d))
@@ -119,23 +122,37 @@ def main():
     # The longest-path problem is NP-complete in general.
     # I don't try to do anything smart, just a backtracking search.
 
-    def _path_lengths(u, steps_so_far, visited):
+    # Optimization: Remove out-edges from the predecessor to end,
+    # except the edge to end itself.
+    assert len(adj[end]) == 1
+    v, d = adj[end][0]
+    adj[v] = [(end, d)]
+    # Likewise for start
+    assert len(adj[start]) == 1
+    v, d = adj[start][0]
+    adj[v].remove((start, d))
+
+    # Model visited sets as bitsets (integers)
+    v_idx = {v: i for i, v in enumerate(sorted(adj))}
+
+    def _max_path_length(u, steps_so_far, visited):
         if u == end:
-            yield steps_so_far
-            return
+            return steps_so_far
 
+        b = 0
         for v, d in adj[u]:
-            if v in visited:
+            bit = 1 << v_idx[v]
+            if visited & bit:
                 continue
-            v_visited = visited | {v}
-            for p in _path_lengths(v, steps_so_far + d, v_visited):
-                yield p
+            b = max(b, _max_path_length(v, steps_so_far + d, visited | bit))
 
-    hike = max(_path_lengths(start, 0, frozenset({start})))
+        return b
+
+    hike = _max_path_length(start, 0, 1 << v_idx[start])
     print("Part 2:", hike)
 
 main()
 
 # multitime -n 5 ; median:
-# cpython: 21.457s
-# pypy:    13.009s
+# cpython: 13.276s
+# pypy:     4.220s
