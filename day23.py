@@ -5,10 +5,13 @@ import os
 import sys
 from pprint import pprint
 
+import copy
 import functools
 import heapq
 from collections import defaultdict
 from collections import namedtuple
+
+import cpmpy as cp
 
 DEBUG = os.environ.get("DEBUG", "")
 
@@ -111,31 +114,88 @@ def main():
     # treat the edges as reversible.
 
     # Add the reverse edges.
-    adj = steps_from.copy()
+    adj = copy.deepcopy(steps_from)
     for u in steps_from:
         for v, d in steps_from[u]:
             adj[v].append((u, d))
 
     # The longest-path problem is NP-complete in general.
-    # I don't try to do anything smart, just a backtracking search.
+    # My attempts at a brute-force (backtracking) search were too slow
+    # (how did others do it in under 60 seconds?)
+    # so I'll use the big hammer: a constraint solver.
 
-    def _path_lengths(u, steps_so_far, visited):
-        if u == end:
-            yield steps_so_far
-            return
+    # true if the point is visited by the path
+    visited = {}
+    for v in steps_from:
+        visited[v] = cp.boolvar(name=f"vis{v}")
+    visited[end] = cp.boolvar(name=f"vis{end}")
 
+    # 1 if the edge is used, 0 if not
+    edge = {}
+    for u in steps_from:
+        for v, _ in steps_from[u]:
+            edge[(u, v)] = cp.intvar(0, 1, name=f"e{u}_{v}")
+            edge[(v, u)] = cp.intvar(0, 1, name=f"e{v}_{u}")
+
+    model = cp.Model()
+
+    # Use each edge in at most one direction.
+    for u in steps_from:
+        for v, _ in steps_from[u]:
+            model += (edge[(u, v)] + edge[(v, u)] <= 1)
+
+    # Simple path: one edge in -> one edge out
+    for u in adj:
+        ingress = [edge[(v, u)] for v, _ in adj[u]]
+        egress = [edge[(u, v)] for v, _ in adj[u]]
+
+        if u == start:
+            assert len(egress) == 1
+            model += (egress[0] == 1)
+        elif u == end:
+            assert len(ingress) == 1
+            model += (ingress[0] == 1)
+        else:
+            model += (sum(ingress) <= 1)
+            model += (sum(ingress) == sum(egress))
+
+    # The constraints so far are sufficient to get a simple path from start to
+    # end.  But they allow for disconnected cycles of edges that add to the
+    # objective function.  To prevent the cycles, I need additional constraints
+    # defining hop counts.
+
+    MAX_HOPS = len(edge) // 2
+    hops = {}
+    for v in adj:
+        hops[v] = cp.intvar(0, MAX_HOPS, name=f"hops{v}")
+
+    for v in adj:
+        ingress = [edge[(u, v)] for u, _ in adj[v]]
+        if len(ingress) == 0:
+            model += (hops[v] == 0)
+        else:
+            model += (sum(ingress) == 0).implies(hops[v] == 0)
+
+        for u, _ in adj[v]:
+            model += (edge[(u, v)] == 1).implies(hops[v] == 1 + hops[u])
+
+    obj = 0
+    for u in adj:
         for v, d in adj[u]:
-            if v in visited:
-                continue
-            v_visited = visited | {v}
-            for p in _path_lengths(v, steps_so_far + d, v_visited):
-                yield p
+            obj += d * edge[(u, v)]
+    model.maximize(obj)
 
-    hike = max(_path_lengths(start, 0, frozenset({start})))
-    print("Part 2:", hike)
+    dprint(model)
+    if model.solve():
+        hike = model.objective_value()
+        print("Part 2:", hike)
+    else:
+        print("Not solved")
 
 main()
 
 # multitime -n 5 ; median:
-# cpython: 21.457s
-# pypy:    13.009s
+# cpython: 0.999s
+# pypy:    Didn't try
+# CPMpy wants OR-Tools, which doesn't work with pypy.
+# cpython runs it so fast that pypy isn't really interesting anyway.
