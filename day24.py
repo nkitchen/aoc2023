@@ -145,5 +145,5 @@ def main():
 main()
 
 # multitime -n 5 ; median:
-# cpython: 21.457s
-# pypy:    13.009s
+# cpython: 1.193s
+# pypy:    5.311s
